@@ -9,6 +9,10 @@ def strides_of(v: torch.Tensor) -> torch.Tensor:
     strides = torch.cumsum(strides, dim=0)
     return strides
 
+def get_fully_connected_mapping(i_ids, j_ids) -> torch.Tensor:
+    mapping = torch.cartesian_prod(i_ids, j_ids)
+    mapping = mapping[mapping[0] != mapping[1], :]
+    return mapping
 
 # @torch.jit.script
 def compute_images(
@@ -30,7 +34,8 @@ def compute_images(
     num_repeats = torch.ceil(cutoff * inv_distances).to(torch.long)
     num_repeats_ = torch.where(pbc, num_repeats, torch.zeros_like(num_repeats))
     # print('num_repeats_: ', num_repeats_.device)
-    images, batch_images, shifts_expanded, shifts_idx_ = [], [], [], []
+    ids = torch.arange(positions.shape[0], device=positions.device, dtype=torch.long)
+    images, mapping, batch_images, shifts_expanded, shifts_idx_ = [], [], [], [], []
     for i_structure in range(num_repeats_.shape[0]):
         num_repeats = num_repeats_[i_structure]
         r1 = torch.arange(
@@ -54,10 +59,15 @@ def compute_images(
         shifts_idx = torch.cartesian_prod(r1, r2, r3)
         shifts = torch.matmul(shifts_idx.to(cell.dtype), cell[i_structure])
         pos = positions[batch == i_structure]
+        i_ids = ids[batch == i_structure].repeat(shifts.shape[0], 1)
+        
+        j_ids = i_ids.repeat(shifts.shape[0], 1)
+        s_mapping = get_fully_connected_mapping(i_ids, j_ids)
         shift_expanded = shifts.repeat(1, n_atoms[i_structure]).view((-1, 3))
         pos_expanded = pos.repeat(shifts.shape[0], 1)
-        images.append(pos_expanded + shift_expanded)
 
+        images.append(pos_expanded + shift_expanded)
+        mapping.append(s_mapping)
         batch_images.append(
             i_structure
             * torch.ones(
@@ -70,6 +80,7 @@ def compute_images(
         )
     return (
         torch.cat(images, dim=0).to(positions.dtype),
+        torch.cat(mapping, dim=0).t(),
         torch.cat(batch_images, dim=0),
         torch.cat(shifts_expanded, dim=0).to(positions.dtype),
         torch.cat(shifts_idx_, dim=0),
