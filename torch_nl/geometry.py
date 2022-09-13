@@ -1,6 +1,7 @@
 import torch
 from typing import Optional
 
+
 def compute_distances(
     pos: torch.Tensor,
     mapping: torch.Tensor,
@@ -16,9 +17,12 @@ def compute_distances(
 
     return dr.norm(p=2, dim=1)
 
+
 def compute_cell_shifts(cell, shifts_idx, batch_mapping):
     if cell is None:
         cell_shifts = None
     else:
-        cell_shifts = torch.einsum("jn,jnm->jm", shifts_idx, cell.view(-1, 3, 3)[batch_mapping])
+        cell_shifts = torch.einsum(
+            "jn,jnm->jm", shifts_idx, cell.view(-1, 3, 3)[batch_mapping]
+        )
     return cell_shifts

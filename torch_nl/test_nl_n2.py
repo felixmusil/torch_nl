@@ -9,19 +9,26 @@ from .neighbor_list import compute_nl_n2, compute_cell_shifts, compute_distances
 
 def bulk_metal():
     frames = [
-        bulk('Si', 'diamond', a=6, cubic=True),
+        bulk("Si", "diamond", a=6, cubic=True),
         bulk("Cu", "fcc", a=3.6),
-        bulk('Si', 'diamond', a=6),
+        bulk("Si", "diamond", a=6),
     ]
     return frames
 
 
 def atomic_structures():
-    frames = [
-        molecule("CH3CH2NH2"),
-        molecule("H2O"),
-        molecule("methylenecyclopropane"),
-    ] + bulk_metal() + [molecule('OCHCHO'), molecule('C3H9C'),]
+    frames = (
+        [
+            molecule("CH3CH2NH2"),
+            molecule("H2O"),
+            molecule("methylenecyclopropane"),
+        ]
+        + bulk_metal()
+        + [
+            molecule("OCHCHO"),
+            molecule("C3H9C"),
+        ]
+    )
     return frames
 
 
@@ -39,11 +46,12 @@ def ase2data(frames):
     cell = torch.cat(cell)
     pbc = torch.cat(pbc)
     stride = torch.from_numpy(np.cumsum(n_atoms))
-    batch = torch.zeros(pos.shape[0],dtype=torch.long)
-    for ii,(st,nd) in enumerate(zip(stride[:-1],stride[1:])):
+    batch = torch.zeros(pos.shape[0], dtype=torch.long)
+    for ii, (st, nd) in enumerate(zip(stride[:-1], stride[1:])):
         batch[st:nd] = ii
     n_atoms = torch.Tensor(n_atoms[1:]).to(dtype=torch.long)
     return pos, cell, pbc, batch, n_atoms
+
 
 @pytest.mark.parametrize(
     "frames, cutoff, self_interaction",
@@ -58,10 +66,9 @@ def test_neighborlist(frames, cutoff, self_interaction):
     the resulting sorted list of distances between neighbors."""
     pos, cell, pbc, batch, n_atoms = ase2data(frames)
 
-
     dds = []
     mapping, batch_mapping, shifts_idx = compute_nl_n2(
-       cutoff, pos, cell, pbc, batch, self_interaction
+        cutoff, pos, cell, pbc, batch, self_interaction
     )
     cell_shifts = compute_cell_shifts(cell, shifts_idx, batch_mapping)
     dds = compute_distances(pos, mapping, cell_shifts)
