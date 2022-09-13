@@ -1,0 +1,40 @@
+[build-system]
+requires = ["setuptools", "wheel", "ninja"]
+build-backend = "setuptools.build_meta"
+
+[tool.black]
+line-length = 80
+target-version = ['py38', 'py39']
+include = '\.pyi?$'
+extend-exclude = '''
+/(
+
+)/
+'''
+
+[tool.pytest.ini_options]
+minversion = "6.0"
+addopts = "-ra -q"
+testpaths = [
+    "mlcg",
+]
+filterwarnings = [
+    "ignore::DeprecationWarning:networkx.*"
+]
+
+[tool.coverage.run]
+branch = true
+source = ["mlcg/"]
+omit = [
+    "**/test_*.py",
+    "**/__init__.py",
+]
+
+[tool.coverage.report]
+exclude_lines = [
+    "if self.debug:" ,
+    "pragma: no cover" ,
+    "raise NotImplementedError" ,
+    "@(abc\\.)?abstractmethod" ,
+]
+ignore_errors = true
