@@ -4,8 +4,7 @@ from ase.build import bulk, molecule
 import numpy as np
 from ase.neighborlist import neighbor_list
 
-from .ase_impl import ase_neighbor_list
-from .torch_impl import compute_nl_n2, compute_cell_shifts, compute_distances
+from .neighbor_list import compute_nl_n2, compute_cell_shifts, compute_distances
 
 
 def bulk_metal():
