@@ -32,7 +32,7 @@ def strides_of(v: torch.Tensor) -> torch.Tensor:
 
 
 def get_number_of_cell_repeats(cutoff, cell, pbc):
-    cell = cell.view((-1, 3, 3))
+    cell = cell.view((-1, 3, 3)).to(torch.float64)
     pbc = pbc.view((-1, 3))
 
     has_pbc = pbc.prod(dim=1, dtype=bool)
@@ -40,8 +40,12 @@ def get_number_of_cell_repeats(cutoff, cell, pbc):
     reciprocal_cell[has_pbc, :, :] = torch.linalg.inv(
         cell[has_pbc, :, :]
     ).transpose(2, 1)
+    print(reciprocal_cell)
     inv_distances = reciprocal_cell.norm(2, dim=-1)
+    print(inv_distances, cutoff, inv_distances* cutoff)
     num_repeats = torch.ceil(cutoff * inv_distances).to(torch.long)
+    # num_repeats[0] += 1
+    print(num_repeats)
     num_repeats_ = torch.where(pbc, num_repeats, torch.zeros_like(num_repeats))
     return num_repeats_
 

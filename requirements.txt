@@ -1,0 +1,7 @@
+ase
+numpy
+# torch
+# developer tools
+pytest
+black[jupyter]
+
