@@ -1,6 +1,8 @@
 import torch
 from typing import Tuple
 
+from .utils import get_number_of_cell_repeats, get_cell_shift_idx, strides_of
+
 
 def get_fully_connected_mapping(
     i_ids, shifts_idx, self_interaction
@@ -24,50 +26,27 @@ def get_fully_connected_mapping(
     return mapping, shifts_idx
 
 
-def compute_images(
+def build_naive_neighborhood(
     positions: torch.Tensor,
     cell: torch.Tensor,
     pbc: torch.Tensor,
     cutoff: float,
     n_atoms: torch.Tensor,
     self_interaction: bool,
-) -> Tuple[
-    torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor
-]:
+) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
     """TODO: add doc"""
     device = positions.device
     dtype = positions.dtype
 
-    cell = cell.view((-1, 3, 3))
-    pbc = pbc.view((-1, 3))
+    num_repeats_ = get_number_of_cell_repeats(cutoff, cell, pbc)
 
-    has_pbc = pbc.prod(dim=1, dtype=bool)
-    reciprocal_cell = torch.zeros_like(cell)
-    reciprocal_cell[has_pbc, :, :] = torch.linalg.inv(
-        cell[has_pbc, :, :]
-    ).transpose(2, 1)
-    inv_distances = reciprocal_cell.norm(2, dim=-1)
-    num_repeats = torch.ceil(cutoff * inv_distances).to(torch.long)
-    num_repeats_ = torch.where(pbc, num_repeats, torch.zeros_like(num_repeats))
-
-    stride = torch.zeros(n_atoms.shape[0] + 1, dtype=torch.long)
-    stride[1:] = torch.cumsum(n_atoms, dim=0, dtype=torch.long)
+    stride = strides_of(n_atoms)
     ids = torch.arange(positions.shape[0], device=device, dtype=torch.long)
 
     mapping, batch_mapping, shifts_idx_ = [], [], []
     for i_structure in range(n_atoms.shape[0]):
         num_repeats = num_repeats_[i_structure]
-        reps = []
-        for ii in range(3):
-            r1 = torch.arange(
-                -num_repeats[ii],
-                num_repeats[ii] + 1,
-                device=device,
-                dtype=dtype,
-            )
-            _, indices = torch.sort(torch.abs(r1))
-            reps.append(r1[indices])
-        shifts_idx = torch.cartesian_prod(*reps)
+        shifts_idx = get_cell_shift_idx(num_repeats, device, dtype)
         i_ids = ids[stride[i_structure] : stride[i_structure + 1]]
 
         s_mapping, shifts_idx = get_fully_connected_mapping(

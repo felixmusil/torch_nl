@@ -1,8 +1,8 @@
 from typing import Optional
 import torch
 
-from .image import compute_images
-from .geometry import compute_distances, compute_cell_shifts
+from .naive_impl import build_naive_neighborhood
+from .geometry import compute_cell_shifts
 
 
 def strict_nl(rcut, pos, cell, mapping, batch_mapping, shifts_idx):
@@ -25,7 +25,7 @@ def strict_nl(rcut, pos, cell, mapping, batch_mapping, shifts_idx):
 
 def compute_nl_n2(rcut, pos, cell, pbc, batch, self_interaction):
     n_atoms = torch.bincount(batch)
-    mapping, batch_mapping, shifts_idx = compute_images(
+    mapping, batch_mapping, shifts_idx = build_naive_neighborhood(
         pos, cell, pbc, rcut, n_atoms, self_interaction
     )
     mapping, mapping_batch, shifts_idx = strict_nl(
