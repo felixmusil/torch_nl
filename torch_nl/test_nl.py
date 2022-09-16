@@ -3,6 +3,7 @@ from ase.build import bulk, molecule
 import numpy as np
 from ase.neighborlist import neighbor_list
 from ase import Atoms
+import torch
 
 from .neighbor_list import (
     compute_neighborlist_n2,
@@ -55,15 +56,16 @@ CaCrP2O7_mvc_11955_symmetrized = {
 
 def bulk_metal():
     frames = [
-        # bulk("Si", "diamond", a=6, cubic=True),
-        # bulk("Si", "diamond", a=6),
-        # bulk("Cu", "fcc", a=3.6),
-        # bulk("Si", "bct", a=6, c=3),
-        # bulk("Bi", "rhombohedral", a=6, alpha=20),
-        # bulk("Bi", "rhombohedral", a=6, alpha=10),
-        # bulk("Bi", "rhombohedral", a=6, alpha=5),
-        # bulk("SiCu", "rocksalt", a=6),
-        # bulk("SiFCu", "fluorite", a=6),
+        bulk("Si", "diamond", a=6, cubic=True),
+        bulk("Si", "diamond", a=6),
+        bulk("Cu", "fcc", a=3.6),
+        bulk("Si", "bct", a=6, c=3),
+        # test very skewed unit cell
+        bulk("Bi", "rhombohedral", a=6, alpha=20),
+        bulk("Bi", "rhombohedral", a=6, alpha=10),
+        bulk("Bi", "rhombohedral", a=6, alpha=5),
+        bulk("SiCu", "rocksalt", a=6),
+        bulk("SiFCu", "fluorite", a=6),
         Atoms(**CaCrP2O7_mvc_11955_symmetrized),
     ]
     return frames
@@ -72,60 +74,61 @@ def bulk_metal():
 def atomic_structures():
     frames = (
         [
-            # molecule("CH3CH2NH2"),
-            # molecule("H2O"),
-            # molecule("methylenecyclopropane"),
+            molecule("CH3CH2NH2"),
+            molecule("H2O"),
+            molecule("methylenecyclopropane"),
         ]
         + bulk_metal()
-        # + [
-        #     molecule("OCHCHO"),
-        #     molecule("C3H9C"),
-        # ]
+        + [
+            molecule("OCHCHO"),
+            molecule("C3H9C"),
+        ]
     )
     return frames
-
-
-# @pytest.mark.parametrize(
-#     "frames, cutoff, self_interaction",
-#     [
-#         (atomic_structures(), rc, self_interaction)
-#         for rc in range(1, 7, 2)
-#         for self_interaction in [True, False]
-#     ],
-# )
-# def test_neighborlist_n2(frames, cutoff, self_interaction):
-#     """Check that torch_neighbor_list gives the same NL as ASE by comparing
-#     the resulting sorted list of distances between neighbors."""
-#     pos, cell, pbc, batch, n_atoms = ase2data(frames)
-
-#     dds = []
-#     mapping, batch_mapping, shifts_idx = compute_neighborlist_n2(
-#         cutoff, pos, cell, pbc, batch, self_interaction
-#     )
-#     cell_shifts = compute_cell_shifts(cell, shifts_idx, batch_mapping)
-#     dds = compute_distances(pos, mapping, cell_shifts)
-#     dds = np.sort(dds.numpy())
-
-#     dd_ref = []
-#     for frame in frames:
-#         idx_i, idx_j, idx_S, dist = neighbor_list(
-#             "ijSd", frame, cutoff=cutoff, self_interaction=self_interaction
-#         )
-#         dd_ref.extend(dist)
-#     dd_ref = np.sort(dd_ref)
-
-#     np.testing.assert_allclose(dd_ref, dds)
 
 
 @pytest.mark.parametrize(
     "frames, cutoff, self_interaction",
     [
         (atomic_structures(), rc, self_interaction)
-        for rc in [7]
-        for self_interaction in [False]
+        for rc in [1,3,5,7]
+        for self_interaction in [True, False]
     ],
 )
 def test_neighborlist_n2(frames, cutoff, self_interaction):
+    """Check that torch_neighbor_list gives the same NL as ASE by comparing
+    the resulting sorted list of distances between neighbors."""
+    pos, cell, pbc, batch, n_atoms = ase2data(frames)
+
+    dds = []
+    mapping, batch_mapping, shifts_idx = compute_neighborlist_n2(
+        cutoff, pos, cell, pbc, batch, self_interaction
+    )
+    cell_shifts = compute_cell_shifts(cell, shifts_idx, batch_mapping)
+    dds = compute_distances(pos, mapping, cell_shifts)
+    dds = np.sort(dds.numpy())
+
+    dd_ref = []
+    for frame in frames:
+        idx_i, idx_j, idx_S, dist = neighbor_list(
+            "ijSd", frame, cutoff=cutoff, self_interaction=self_interaction
+        )
+        dd_ref.extend(dist)
+    dd_ref = np.sort(dd_ref)
+
+    np.testing.assert_allclose(dd_ref, dds)
+
+
+
+@pytest.mark.parametrize(
+    "frames, cutoff, self_interaction",
+    [
+        (atomic_structures(), rc, self_interaction)
+        for rc in [1,3,5,7]
+        for self_interaction in [False, True]
+    ],
+)
+def test_neighborlist_linked_cell(frames, cutoff, self_interaction):
     """Check that torch_neighbor_list gives the same NL as ASE by comparing
     the resulting sorted list of distances between neighbors."""
     pos, cell, pbc, batch, n_atoms = ase2data(frames)
@@ -144,7 +147,22 @@ def test_neighborlist_n2(frames, cutoff, self_interaction):
             "ijSd", frame, cutoff=cutoff, self_interaction=self_interaction
         )
         dd_ref.extend(dist)
+    # nice for understanding if something goes wrong
+    idx_S = torch.from_numpy(idx_S).to(torch.float64)
+    missing_entries = []
+    for ineigh in range(idx_i.shape[0]):
+        mask = torch.logical_and(idx_i[ineigh] == mapping[0], idx_j[ineigh] == mapping[1])
+
+
+        if torch.any(torch.all(idx_S[ineigh] == shifts_idx[mask], dim=1)):
+            pass
+        else:
+            missing_entries.append((idx_i[ineigh], idx_j[ineigh], idx_S[ineigh]))
+            print(missing_entries[-1])
+            print(compute_cell_shifts(cell, idx_S[ineigh].view((1,-1)), [0]))
+
+
     dd_ref = np.sort(dd_ref)
-    print(dd_ref)
-    print(dds)
+    print(dd_ref[-20:])
+    print(dds[-20:])
     np.testing.assert_allclose(dd_ref, dds)

@@ -123,21 +123,20 @@ def linked_cell(
     # compute the positions of the replicated unit cell (including the original)
     # they are organized such that: 1st n_atom are the non-shifted atom, 2nd n_atom are moved by the same translation, ...
     images = pos[i_ids] + cell_shifts
-    # create a rectangular box at [0,0,0] that encompases all the atoms (hence shifting the atoms so that they lie on the positive side of the box)
+    # create a rectangular box at [0,0,0] that encompases all the atoms (hence shifting the atoms so that they lie inside the box)
     b_min = images.min(dim=0).values
     b_max = images.max(dim=0).values
     images -= b_min - 1e-5
     i_pos = pos - b_min + 1e-5
-    # print(images, i_pos)
     box_length = b_max - b_min + 1e-3
-
-    box_length *= 1.5
     # divide the box into square bins of size cutoff in 3d
     nbins_s = torch.maximum(
         torch.ceil(box_length / cutoff), pos.new_ones(3)
-    ).to(torch.long)
+    )
+    # adapt the box lenghts so that it encompasses 
+    box_vec = torch.diag_embed(nbins_s*cutoff)
+    nbins_s = nbins_s.to(torch.long)
     nbins = torch.prod(nbins_s)
-    box_vec = torch.diag_embed(box_length)
     # determine which bins the original atoms and the images belong to following a linear indexing of the 3d bins
     bin_index_i = get_linear_bin_idx(box_vec, i_pos, nbins_s)
     bin_index_j = get_linear_bin_idx(box_vec, images, nbins_s)
