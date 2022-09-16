@@ -4,7 +4,6 @@ from typing import Mapping
 from types import GeneratorType
 
 
-
 def eval_func(func, inp):
     if isinstance(inp, Mapping):
         inner = lambda inp: func(**inp)

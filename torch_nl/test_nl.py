@@ -141,8 +141,8 @@ def test_neighborlist_n2(frames, cutoff, self_interaction):
     "frames, cutoff, self_interaction",
     [
         (atomic_structures(), rc, self_interaction)
-        for rc in [3]  # [1,3,5,7]
-        for self_interaction in [False]  # [False, True]
+        for rc in [1, 3, 5, 7]
+        for self_interaction in [False, True]
     ],
 )
 def test_neighborlist_linked_cell(frames, cutoff, self_interaction):
@@ -179,7 +179,13 @@ def test_neighborlist_linked_cell(frames, cutoff, self_interaction):
                 (idx_i[ineigh], idx_j[ineigh], idx_S[ineigh])
             )
             print(missing_entries[-1])
-            print(compute_cell_shifts(cell, idx_S[ineigh].view((1, -1)), [0]))
+            print(
+                compute_cell_shifts(
+                    cell,
+                    idx_S[ineigh].view((1, -1)),
+                    torch.tensor([0], dtype=torch.long),
+                )
+            )
 
     dd_ref = np.sort(dd_ref)
     print(dd_ref[-20:])

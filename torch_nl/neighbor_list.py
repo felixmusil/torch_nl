@@ -1,4 +1,3 @@
-from typing import Optional
 import torch
 
 from .naive_impl import build_naive_neighborhood
@@ -6,7 +5,15 @@ from .geometry import compute_cell_shifts
 from .linked_cell import build_linked_cell_neighborhood
 
 
-def strict_nl(cutoff, pos, cell, mapping, batch_mapping, shifts_idx):
+@torch.jit.script
+def strict_nl(
+    cutoff: float,
+    pos: torch.Tensor,
+    cell: torch.Tensor,
+    mapping: torch.Tensor,
+    batch_mapping: torch.Tensor,
+    shifts_idx: torch.Tensor,
+):
     """Apply a strict cutoff to the neighbor list defined in mapping.
 
     Parameters
@@ -46,7 +53,15 @@ def strict_nl(cutoff, pos, cell, mapping, batch_mapping, shifts_idx):
     return mapping, mapping_batch, shifts_idx
 
 
-def compute_neighborlist_n2(cutoff, pos, cell, pbc, batch, self_interaction):
+@torch.jit.script
+def compute_neighborlist_n2(
+    cutoff: float,
+    pos: torch.Tensor,
+    cell: torch.Tensor,
+    pbc: torch.Tensor,
+    batch: torch.Tensor,
+    self_interaction: bool = False,
+):
     n_atoms = torch.bincount(batch)
     mapping, batch_mapping, shifts_idx = build_naive_neighborhood(
         pos, cell, pbc, cutoff, n_atoms, self_interaction
@@ -57,7 +72,15 @@ def compute_neighborlist_n2(cutoff, pos, cell, pbc, batch, self_interaction):
     return mapping, mapping_batch, shifts_idx
 
 
-def compute_neighborlist(cutoff, pos, cell, pbc, batch, self_interaction):
+@torch.jit.script
+def compute_neighborlist(
+    cutoff: float,
+    pos: torch.Tensor,
+    cell: torch.Tensor,
+    pbc: torch.Tensor,
+    batch: torch.Tensor,
+    self_interaction: bool = False,
+):
     n_atoms = torch.bincount(batch)
     mapping, batch_mapping, shifts_idx = build_linked_cell_neighborhood(
         pos, cell, pbc, cutoff, n_atoms, self_interaction

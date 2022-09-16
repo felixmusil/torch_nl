@@ -2,6 +2,7 @@ import torch
 from typing import Optional
 
 
+@torch.jit.script
 def compute_distances(
     pos: torch.Tensor,
     mapping: torch.Tensor,
@@ -18,7 +19,10 @@ def compute_distances(
     return dr.norm(p=2, dim=1)
 
 
-def compute_cell_shifts(cell, shifts_idx, batch_mapping):
+@torch.jit.script
+def compute_cell_shifts(
+    cell: torch.Tensor, shifts_idx: torch.Tensor, batch_mapping: torch.Tensor
+):
     if cell is None:
         cell_shifts = None
     else:
