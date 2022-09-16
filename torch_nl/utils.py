@@ -1,5 +1,6 @@
 import torch
 import numpy as np
+from torch.types import _device, _dtype
 
 
 def ase2data(frames):
@@ -23,6 +24,7 @@ def ase2data(frames):
     return pos, cell, pbc, batch, n_atoms
 
 
+@torch.jit.script
 def strides_of(v: torch.Tensor) -> torch.Tensor:
     v = v.flatten()
     stride = v.new_empty(v.shape[0] + 1)
@@ -31,35 +33,37 @@ def strides_of(v: torch.Tensor) -> torch.Tensor:
     return stride
 
 
-def get_number_of_cell_repeats(cutoff, cell, pbc):
-    cell = cell.view((-1, 3, 3)).to(torch.float64)
+@torch.jit.script
+def get_number_of_cell_repeats(
+    cutoff: float, cell: torch.Tensor, pbc: torch.Tensor
+) -> torch.Tensor:
+    cell = cell.view((-1, 3, 3))
     pbc = pbc.view((-1, 3))
 
-    has_pbc = pbc.prod(dim=1, dtype=bool)
+    has_pbc = pbc.prod(dim=1, dtype=torch.bool)
     reciprocal_cell = torch.zeros_like(cell)
     reciprocal_cell[has_pbc, :, :] = torch.linalg.inv(
         cell[has_pbc, :, :]
     ).transpose(2, 1)
-    print(reciprocal_cell)
     inv_distances = reciprocal_cell.norm(2, dim=-1)
-    print(inv_distances, cutoff, inv_distances* cutoff)
     num_repeats = torch.ceil(cutoff * inv_distances).to(torch.long)
-    # num_repeats[0] += 1
-    print(num_repeats)
     num_repeats_ = torch.where(pbc, num_repeats, torch.zeros_like(num_repeats))
     return num_repeats_
 
 
-def get_cell_shift_idx(num_repeats, device, dtype):
+@torch.jit.script
+def get_cell_shift_idx(
+    num_repeats: torch.Tensor, dtype: _dtype
+) -> torch.Tensor:
     reps = []
     for ii in range(3):
         r1 = torch.arange(
             -num_repeats[ii],
             num_repeats[ii] + 1,
-            device=device,
+            device=num_repeats.device,
             dtype=dtype,
         )
         _, indices = torch.sort(torch.abs(r1))
         reps.append(r1[indices])
-    shifts_idx = torch.cartesian_prod(*reps)
+    shifts_idx = torch.cartesian_prod(reps[0], reps[1], reps[2])
     return shifts_idx

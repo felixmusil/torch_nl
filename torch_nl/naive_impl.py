@@ -4,9 +4,10 @@ from typing import Tuple
 from .utils import get_number_of_cell_repeats, get_cell_shift_idx, strides_of
 
 
+@torch.jit.script
 def get_fully_connected_mapping(
-    i_ids, shifts_idx, self_interaction
-) -> torch.Tensor:
+    i_ids: torch.Tensor, shifts_idx: torch.Tensor, self_interaction: bool
+) -> Tuple[torch.Tensor, torch.Tensor]:
     n_atom = i_ids.shape[0]
     n_atom2 = n_atom * n_atom
     n_cell_image = shifts_idx.shape[0]
@@ -14,7 +15,9 @@ def get_fully_connected_mapping(
     mapping = torch.cartesian_prod(i_ids, j_ids)
     shifts_idx = shifts_idx.repeat((n_atom2, 1))
     if not self_interaction:
-        mask = torch.ones(mapping.shape[0], dtype=bool, device=i_ids.device)
+        mask = torch.ones(
+            mapping.shape[0], dtype=torch.bool, device=i_ids.device
+        )
         ids = n_cell_image * torch.arange(
             n_atom, device=i_ids.device
         ) + torch.arange(
@@ -26,6 +29,7 @@ def get_fully_connected_mapping(
     return mapping, shifts_idx
 
 
+@torch.jit.script
 def build_naive_neighborhood(
     positions: torch.Tensor,
     cell: torch.Tensor,
@@ -46,7 +50,7 @@ def build_naive_neighborhood(
     mapping, batch_mapping, shifts_idx_ = [], [], []
     for i_structure in range(n_atoms.shape[0]):
         num_repeats = num_repeats_[i_structure]
-        shifts_idx = get_cell_shift_idx(num_repeats, device, dtype)
+        shifts_idx = get_cell_shift_idx(num_repeats, dtype)
         i_ids = ids[stride[i_structure] : stride[i_structure + 1]]
 
         s_mapping, shifts_idx = get_fully_connected_mapping(
