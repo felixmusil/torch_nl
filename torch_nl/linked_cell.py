@@ -155,7 +155,7 @@ def linked_cell(
     i_bins_l = torch.unique(bin_index_i)
     i_bins_s = unravel_3d(i_bins_l, nbins_s)
     # find their neighbors. Since they have a side length of cutoff only 27 bins are in the neighborhood
-    dd = torch.tensor([0, 1, -1], dtype=torch.long)
+    dd = torch.tensor([0, 1, -1], dtype=torch.long, device=device)
     bin_shifts = torch.cartesian_prod(dd, dd, dd).repeat((i_bins_s.shape[0], 1))
     neigh_bins_s = torch.repeat_interleave(i_bins_s, 27, dim=0) + bin_shifts
     neigh_bins_l = ravel_3d(neigh_bins_s, nbins_s)
@@ -247,7 +247,7 @@ def build_linked_cell_neighborhood(
 
     stride = strides_of(n_atoms)
     ids = torch.arange(positions.shape[0], device=device, dtype=torch.long)
-    print(num_repeats, pbc)
+
     mapping, batch_mapping, cell_shifts_idx = [], [], []
     for i_structure in range(n_structure):
         # select the atoms of structure i
@@ -268,7 +268,6 @@ def build_linked_cell_neighborhood(
         # shift the mapping indices so that they can access positions
         mapping.append(neigh_atom + stride[i_structure])
         cell_shifts_idx.append(neigh_shift_idx)
-    # print(mapping)
     return (
         torch.cat(mapping, dim=1),
         torch.cat(batch_mapping, dim=0),

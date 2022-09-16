@@ -3,7 +3,7 @@ import numpy as np
 from torch.types import _device, _dtype
 
 
-def ase2data(frames):
+def ase2data(frames, device='cpu'):
     n_atoms = [0]
     pos = []
     cell = []
@@ -21,7 +21,7 @@ def ase2data(frames):
     for ii, (st, nd) in enumerate(zip(stride[:-1], stride[1:])):
         batch[st:nd] = ii
     n_atoms = torch.Tensor(n_atoms[1:]).to(dtype=torch.long)
-    return pos, cell, pbc, batch, n_atoms
+    return pos.to(device=device), cell.to(device=device), pbc.to(device=device), batch.to(device=device), n_atoms.to(device=device)
 
 
 @torch.jit.script
