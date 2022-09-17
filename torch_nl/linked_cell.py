@@ -5,7 +5,7 @@ from .utils import get_number_of_cell_repeats, get_cell_shift_idx, strides_of
 from .geometry import compute_cell_shifts
 
 
-@torch.jit.script
+# @torch.jit.script
 def ravel_3d(idx_3d: torch.Tensor, shape: torch.Tensor) -> torch.Tensor:
     """Convert 3d indices meant for an array of sizes `shape` into linear
     indices.
@@ -28,7 +28,7 @@ def ravel_3d(idx_3d: torch.Tensor, shape: torch.Tensor) -> torch.Tensor:
     return idx_linear
 
 
-@torch.jit.script
+# @torch.jit.script
 def unravel_3d(idx_linear: torch.Tensor, shape: torch.Tensor) -> torch.Tensor:
     """Convert linear indices meant for an array of sizes `shape` into 3d indices.
 
@@ -55,7 +55,7 @@ def unravel_3d(idx_linear: torch.Tensor, shape: torch.Tensor) -> torch.Tensor:
     return idx_3d
 
 
-@torch.jit.script
+# @torch.jit.script
 def get_linear_bin_idx(
     cell: torch.Tensor, pos: torch.Tensor, nbins_s: torch.Tensor
 ) -> torch.Tensor:
@@ -81,7 +81,7 @@ def get_linear_bin_idx(
     return bin_index_l
 
 
-@torch.jit.script
+# @torch.jit.script
 def linked_cell(
     pos: torch.Tensor,
     cell: torch.Tensor,
@@ -201,7 +201,7 @@ def linked_cell(
     return neigh_atom, neigh_shift_idx
 
 
-@torch.jit.script
+# @torch.jit.script
 def build_linked_cell_neighborhood(
     positions: torch.Tensor,
     cell: torch.Tensor,

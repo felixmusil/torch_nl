@@ -4,7 +4,7 @@ from typing import Tuple
 from .utils import get_number_of_cell_repeats, get_cell_shift_idx, strides_of
 
 
-@torch.jit.script
+# @torch.jit.script
 def get_fully_connected_mapping(
     i_ids: torch.Tensor, shifts_idx: torch.Tensor, self_interaction: bool
 ) -> Tuple[torch.Tensor, torch.Tensor]:
@@ -29,7 +29,7 @@ def get_fully_connected_mapping(
     return mapping, shifts_idx
 
 
-@torch.jit.script
+# @torch.jit.script
 def build_naive_neighborhood(
     positions: torch.Tensor,
     cell: torch.Tensor,

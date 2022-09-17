@@ -5,7 +5,7 @@ from .geometry import compute_cell_shifts
 from .linked_cell import build_linked_cell_neighborhood
 
 
-@torch.jit.script
+# @torch.jit.script
 def strict_nl(
     cutoff: float,
     pos: torch.Tensor,
@@ -53,7 +53,7 @@ def strict_nl(
     return mapping, mapping_batch, shifts_idx
 
 
-@torch.jit.script
+# @torch.jit.script
 def compute_neighborlist_n2(
     cutoff: float,
     pos: torch.Tensor,
@@ -72,7 +72,7 @@ def compute_neighborlist_n2(
     return mapping, mapping_batch, shifts_idx
 
 
-@torch.jit.script
+# @torch.jit.script
 def compute_neighborlist(
     cutoff: float,
     pos: torch.Tensor,
