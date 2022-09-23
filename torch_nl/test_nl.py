@@ -141,6 +141,8 @@ def test_neighborlist_n2(frames, cutoff, self_interaction):
     "frames, cutoff, self_interaction",
     [
         (atomic_structures(), rc, self_interaction)
+        # for rc in [3] #[1, 3, 5, 7]
+        # for self_interaction in [False]
         for rc in [1, 3, 5, 7]
         for self_interaction in [False, True]
     ],

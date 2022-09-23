@@ -3,7 +3,7 @@ import numpy as np
 from torch.types import _dtype
 
 
-def ase2data(frames, device='cpu'):
+def ase2data(frames, device="cpu"):
     n_atoms = [0]
     pos = []
     cell = []
@@ -21,7 +21,13 @@ def ase2data(frames, device='cpu'):
     for ii, (st, nd) in enumerate(zip(stride[:-1], stride[1:])):
         batch[st:nd] = ii
     n_atoms = torch.Tensor(n_atoms[1:]).to(dtype=torch.long)
-    return pos.to(device=device), cell.to(device=device), pbc.to(device=device), batch.to(device=device), n_atoms.to(device=device)
+    return (
+        pos.to(device=device),
+        cell.to(device=device),
+        pbc.to(device=device),
+        batch.to(device=device),
+        n_atoms.to(device=device),
+    )
 
 
 def strides_of(v: torch.Tensor) -> torch.Tensor:

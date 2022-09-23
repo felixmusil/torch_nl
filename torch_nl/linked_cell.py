@@ -114,7 +114,9 @@ def linked_cell(
     # find all the integer shifts of the unit cell given the cutoff and periodicity
     shifts_idx = get_cell_shift_idx(num_repeats, dtype)
     n_cell_image = shifts_idx.shape[0]
-    shifts_idx = torch.repeat_interleave(shifts_idx, n_atom, dim=0, output_size=n_atom*n_cell_image)
+    shifts_idx = torch.repeat_interleave(
+        shifts_idx, n_atom, dim=0, output_size=n_atom * n_cell_image
+    )
     batch_image = torch.zeros((shifts_idx.shape[0]), dtype=torch.long)
     cell_shifts = compute_cell_shifts(
         cell.view(-1, 3, 3), shifts_idx, batch_image
@@ -153,20 +155,34 @@ def linked_cell(
     # find their neighbors. Since they have a side length of cutoff only 27 bins are in the neighborhood
     dd = torch.tensor([0, 1, -1], dtype=torch.long, device=device)
     bin_shifts = torch.cartesian_prod(dd, dd, dd).repeat((i_bins_s.shape[0], 1))
-    neigh_bins_s = torch.repeat_interleave(i_bins_s, 27, dim=0, output_size=27*i_bins_s.shape[0]) + bin_shifts
+    neigh_bins_s = (
+        torch.repeat_interleave(
+            i_bins_s, 27, dim=0, output_size=27 * i_bins_s.shape[0]
+        )
+        + bin_shifts
+    )
 
-    mask = torch.all(torch.logical_and(neigh_bins_s < nbins_s.view(1,3), neigh_bins_s >= 0), dim=1)
+    mask = torch.all(
+        torch.logical_and(neigh_bins_s < nbins_s.view(1, 3), neigh_bins_s >= 0),
+        dim=1,
+    )
 
     # remove the bins that are outside of the search range, i.e. beyond the borders of the box in the case of non-periodic directions
     repeats = mask.view(-1, 27).sum(dim=1)
-    neigh_i_bins_l = torch.repeat_interleave(i_bins_l, repeats, dim=0, output_size=repeats.sum())
+    neigh_i_bins_l = torch.repeat_interleave(
+        i_bins_l, repeats, dim=0, output_size=repeats.sum()
+    )
     neigh_j_bins_l = ravel_3d(neigh_bins_s[mask], nbins_s)
 
-    max_n_atom =  i_bins_l.shape[0] * n_atom_i_per_bin.max() * n_atom_j_per_bin.max() * 27
-    neigh_atom_buffer = torch.empty((2, max_n_atom), dtype=torch.long, device=device)
+    max_n_atom = (
+        i_bins_l.shape[0] * n_atom_i_per_bin.max() * n_atom_j_per_bin.max() * 27
+    )
+    neigh_atom_buffer = torch.empty(
+        (2, max_n_atom), dtype=torch.long, device=device
+    )
     n_atom_j = n_atom_j_per_bin.max()
 
-    j_atoms = [[] for i in range(i_bins_l.max()+1)]
+    j_atoms = [[] for i in range(i_bins_l.max() + 1)]
     for ii in range(neigh_j_bins_l.shape[0]):
         bin_idx_j, bin_idx_i = neigh_j_bins_l[ii], neigh_i_bins_l[ii]
         st, nd = (
@@ -188,11 +204,13 @@ def linked_cell(
         aa = torch.cat(j_atoms[bin_idx_i], dim=0)
         n_atom_i = i_atoms.shape[0]
         n_atom_j = aa.shape[0]
-        n_atom_ij = n_atom_i *n_atom_j
-        neigh_atom_buffer[0,jj:jj+n_atom_ij] = torch.repeat_interleave(i_atoms, n_atom_j, dim=0, output_size=n_atom_ij)
-        neigh_atom_buffer[1,jj:jj+n_atom_ij] = aa.repeat(n_atom_i)
+        n_atom_ij = n_atom_i * n_atom_j
+        neigh_atom_buffer[0, jj : jj + n_atom_ij] = torch.repeat_interleave(
+            i_atoms, n_atom_j, dim=0, output_size=n_atom_ij
+        )
+        neigh_atom_buffer[1, jj : jj + n_atom_ij] = aa.repeat(n_atom_i)
         jj += n_atom_ij
-    neigh_atom = neigh_atom_buffer[:,:jj]
+    neigh_atom = neigh_atom_buffer[:, :jj]
 
     if not self_interaction:
         # neighbor atoms are still indexed from 0 to n_atom*n_cell_image

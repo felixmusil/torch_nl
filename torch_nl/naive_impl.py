@@ -10,7 +10,9 @@ def get_fully_connected_mapping(
     n_atom = i_ids.shape[0]
     n_atom2 = n_atom * n_atom
     n_cell_image = shifts_idx.shape[0]
-    j_ids = torch.repeat_interleave(i_ids, n_cell_image, dim=0, output_size=n_cell_image*n_atom)
+    j_ids = torch.repeat_interleave(
+        i_ids, n_cell_image, dim=0, output_size=n_cell_image * n_atom
+    )
     mapping = torch.cartesian_prod(i_ids, j_ids)
     shifts_idx = shifts_idx.repeat((n_atom2, 1))
     if not self_interaction:
@@ -56,7 +58,12 @@ def build_naive_neighborhood(
         )
         mapping.append(s_mapping)
         batch_mapping.append(
-            torch.full((s_mapping.shape[0],), i_structure, dtype=torch.long, device=device)
+            torch.full(
+                (s_mapping.shape[0],),
+                i_structure,
+                dtype=torch.long,
+                device=device,
+            )
         )
         shifts_idx_.append(shifts_idx)
     return (
