@@ -1,6 +1,6 @@
 import torch
 import numpy as np
-from torch.types import _device, _dtype
+from torch.types import _dtype
 
 
 def ase2data(frames, device='cpu'):
@@ -24,7 +24,6 @@ def ase2data(frames, device='cpu'):
     return pos.to(device=device), cell.to(device=device), pbc.to(device=device), batch.to(device=device), n_atoms.to(device=device)
 
 
-@torch.jit.script
 def strides_of(v: torch.Tensor) -> torch.Tensor:
     v = v.flatten()
     stride = v.new_empty(v.shape[0] + 1)
@@ -33,7 +32,6 @@ def strides_of(v: torch.Tensor) -> torch.Tensor:
     return stride
 
 
-@torch.jit.script
 def get_number_of_cell_repeats(
     cutoff: float, cell: torch.Tensor, pbc: torch.Tensor
 ) -> torch.Tensor:
@@ -51,7 +49,6 @@ def get_number_of_cell_repeats(
     return num_repeats_
 
 
-@torch.jit.script
 def get_cell_shift_idx(
     num_repeats: torch.Tensor, dtype: _dtype
 ) -> torch.Tensor:
