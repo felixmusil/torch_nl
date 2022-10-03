@@ -108,7 +108,7 @@ def scatter_bin_index(
         (nbins * max_n_atom_per_bin,), n_images, device=device, dtype=torch.long
     )
     sorted_bin_id = torch.remainder(
-        torch.arange(bin_index.shape[0]), max_n_atom_per_bin
+        torch.arange(bin_index.shape[0], device=device), max_n_atom_per_bin
     )
     sorted_bin_id = sorted_bin_index * max_n_atom_per_bin + sorted_bin_id
     bin_id.scatter_(dim=0, index=sorted_bin_id, src=sorted_id)
