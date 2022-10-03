@@ -78,6 +78,44 @@ def get_linear_bin_idx(
     return bin_index_l
 
 
+def scatter_bin_index(
+    nbins: torch.Tensor,
+    max_n_atom_per_bin: torch.Tensor,
+    n_images: int,
+    bin_index: torch.Tensor,
+):
+    """convert the linear table `bin_index` into the table `bin_id`. Empty entries in `bin_id` are set to `n_images` so that they can be removed later.
+
+    Parameters
+    ----------
+    nbins : _type_
+        total number of bins
+    max_n_atom_per_bin : _type_
+        maximum number of atoms per bin
+    n_images : _type_
+        total number of atoms counting the pbc replicas
+    bin_index : _type_
+        map relating `atom_index` to the `bin_index` that it belongs to such that `bin_index[atom_index] -> bin_index`.
+
+    Returns
+    -------
+    bin_id : torch.Tensor [nbins, max_n_atom_per_bin]
+        relate `bin_index` (row) with the `atom_index` (stored in the columns).
+    """
+    device = bin_index.device
+    sorted_bin_index, sorted_id = torch.sort(bin_index)
+    bin_id = torch.full(
+        (nbins * max_n_atom_per_bin,), n_images, device=device, dtype=torch.long
+    )
+    sorted_bin_id = torch.remainder(
+        torch.arange(bin_index.shape[0]), max_n_atom_per_bin
+    )
+    sorted_bin_id = sorted_bin_index * max_n_atom_per_bin + sorted_bin_id
+    bin_id.scatter_(dim=0, index=sorted_bin_id, src=sorted_id)
+    bin_id = bin_id.view((nbins, max_n_atom_per_bin))
+    return bin_id
+
+
 def linked_cell(
     pos: torch.Tensor,
     cell: torch.Tensor,
@@ -127,11 +165,11 @@ def linked_cell(
     # compute the positions of the replicated unit cell (including the original)
     # they are organized such that: 1st n_atom are the non-shifted atom, 2nd n_atom are moved by the same translation, ...
     images = pos[i_ids] + cell_shifts
+    n_images = images.shape[0]
     # create a rectangular box at [0,0,0] that encompases all the atoms (hence shifting the atoms so that they lie inside the box)
     b_min = images.min(dim=0).values
     b_max = images.max(dim=0).values
     images -= b_min - 1e-5
-    i_pos = pos - b_min + 1e-5
     box_length = b_max - b_min + 1e-3
     # divide the box into square bins of size cutoff in 3d
     nbins_s = torch.maximum(torch.ceil(box_length / cutoff), pos.new_ones(3))
@@ -140,77 +178,77 @@ def linked_cell(
     nbins_s = nbins_s.to(torch.long)
     nbins = torch.prod(nbins_s)
     # determine which bins the original atoms and the images belong to following a linear indexing of the 3d bins
-    bin_index_i = get_linear_bin_idx(box_vec, i_pos, nbins_s)
     bin_index_j = get_linear_bin_idx(box_vec, images, nbins_s)
-    # reorder the atoms acording to their bins id
-    _, atom_i = torch.sort(bin_index_i)
-    sb_idx_j, atom_j = torch.sort(bin_index_j)
-    n_atom_i_per_bin = torch.bincount(bin_index_i, minlength=nbins)
-    n_atom_j_per_bin = torch.bincount(sb_idx_j, minlength=nbins)
-    s_atom_j_bin_stride = strides_of(n_atom_j_per_bin)
-    s_atom_i_bin_stride = strides_of(n_atom_i_per_bin)
+    n_atom_j_per_bin = torch.bincount(bin_index_j, minlength=nbins)
+    max_n_atom_per_bin = n_atom_j_per_bin.max()
+    # convert the linear map bin_index_j into a 2d map. This allows for
+    # fully vectorized neighbor assignment
+    bin_id_j = scatter_bin_index(
+        nbins, max_n_atom_per_bin, n_images, bin_index_j
+    )
+
     # find which bins the original atoms belong to
+    bin_index_i = bin_index_j[:n_atom]
     i_bins_l = torch.unique(bin_index_i)
     i_bins_s = unravel_3d(i_bins_l, nbins_s)
-    # find their neighbors. Since they have a side length of cutoff only 27 bins are in the neighborhood
+
+    # find the bin indices in the neighborhood of i_bins_l. Since the bins have
+    # a side length of cutoff only 27 bins are in the neighborhood
+    # (including itself)
     dd = torch.tensor([0, 1, -1], dtype=torch.long, device=device)
-    bin_shifts = torch.cartesian_prod(dd, dd, dd).repeat((i_bins_s.shape[0], 1))
+    bin_shifts = torch.cartesian_prod(dd, dd, dd)
+    n_neigh_bins = bin_shifts.shape[0]
+    bin_shifts = bin_shifts.repeat((i_bins_s.shape[0], 1))
     neigh_bins_s = (
         torch.repeat_interleave(
-            i_bins_s, 27, dim=0, output_size=27 * i_bins_s.shape[0]
+            i_bins_s,
+            n_neigh_bins,
+            dim=0,
+            output_size=n_neigh_bins * i_bins_s.shape[0],
         )
         + bin_shifts
     )
-
+    # some of the generated bin_idx might not be valid
     mask = torch.all(
         torch.logical_and(neigh_bins_s < nbins_s.view(1, 3), neigh_bins_s >= 0),
         dim=1,
     )
 
-    # remove the bins that are outside of the search range, i.e. beyond the borders of the box in the case of non-periodic directions
-    repeats = mask.view(-1, 27).sum(dim=1)
-    neigh_i_bins_l = torch.repeat_interleave(
-        i_bins_l, repeats, dim=0, output_size=repeats.sum()
-    )
+    # remove the bins that are outside of the search range, i.e. beyond the borders of the box in the case of non-periodic directions.
     neigh_j_bins_l = ravel_3d(neigh_bins_s[mask], nbins_s)
 
-    max_n_atom = (
-        i_bins_l.shape[0] * n_atom_i_per_bin.max() * n_atom_j_per_bin.max() * 27
+    max_neigh_per_atom = max_n_atom_per_bin * n_neigh_bins
+    # the i_bin related to neigh_j_bins_l
+    repeats = mask.view(-1, n_neigh_bins).sum(dim=1)
+    neigh_i_bins_l = torch.cat(
+        [
+            torch.arange(rr, device=device) + i_bins_l[ii] * n_neigh_bins
+            for ii, rr in enumerate(repeats)
+        ],
+        dim=0,
     )
-    neigh_atom_buffer = torch.empty(
-        (2, max_n_atom), dtype=torch.long, device=device
+    # the linear neighborlist. make it at large as necessary
+    neigh_atom = torch.empty(
+        (2, n_atom * max_neigh_per_atom), dtype=torch.long, device=device
     )
-    n_atom_j = n_atom_j_per_bin.max()
-
-    j_atoms = [[] for i in range(i_bins_l.max() + 1)]
-    for ii in range(neigh_j_bins_l.shape[0]):
-        bin_idx_j, bin_idx_i = neigh_j_bins_l[ii], neigh_i_bins_l[ii]
-        st, nd = (
-            s_atom_j_bin_stride[bin_idx_j],
-            s_atom_j_bin_stride[bin_idx_j + 1],
-        )
-        # index of the neighbor atoms
-        j_atoms[bin_idx_i].append(atom_j[st:nd])
-
-    jj = 0
-    for ii in range(i_bins_l.shape[0]):
-        bin_idx_i = i_bins_l[ii]
-        st, nd = (
-            s_atom_i_bin_stride[bin_idx_i],
-            s_atom_i_bin_stride[bin_idx_i + 1],
-        )
-        # index of the central atoms
-        i_atoms = atom_i[st:nd]
-        aa = torch.cat(j_atoms[bin_idx_i], dim=0)
-        n_atom_i = i_atoms.shape[0]
-        n_atom_j = aa.shape[0]
-        n_atom_ij = n_atom_i * n_atom_j
-        neigh_atom_buffer[0, jj : jj + n_atom_ij] = torch.repeat_interleave(
-            i_atoms, n_atom_j, dim=0, output_size=n_atom_ij
-        )
-        neigh_atom_buffer[1, jj : jj + n_atom_ij] = aa.repeat(n_atom_i)
-        jj += n_atom_ij
-    neigh_atom = neigh_atom_buffer[:, :jj]
+    # fill the i_atom index
+    neigh_atom[0] = (
+        torch.arange(n_atom).view(-1, 1).repeat(1, max_neigh_per_atom).view(-1)
+    )
+    # relate `bin_index` (row) with the `neighbor_atom_index` (stored in the columns). empty entries are set to `n_images`
+    bin_id_ij = torch.full(
+        (nbins * n_neigh_bins, max_n_atom_per_bin),
+        n_images,
+        dtype=torch.long,
+        device=device,
+    )
+    # fill the bins with neighbor atom indices
+    bin_id_ij[neigh_i_bins_l] = bin_id_j[neigh_j_bins_l]
+    bin_id_ij = bin_id_ij.view((nbins, max_neigh_per_atom))
+    # map the neighbors in the bins to the central atoms
+    neigh_atom[1] = bin_id_ij[bin_index_i].view(-1)
+    # remove empty entries
+    neigh_atom = neigh_atom[:, neigh_atom[1] != n_images]
 
     if not self_interaction:
         # neighbor atoms are still indexed from 0 to n_atom*n_cell_image
@@ -223,7 +261,7 @@ def linked_cell(
     neigh_shift_idx = shifts_idx[neigh_atom[1]]
     # make sure the j_atom indices access the original positions
     neigh_atom[1] = torch.remainder(neigh_atom[1], n_atom)
-
+    # print(neigh_atom)
     return neigh_atom, neigh_shift_idx
 
 

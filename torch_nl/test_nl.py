@@ -168,6 +168,9 @@ def test_neighborlist_linked_cell(frames, cutoff, self_interaction):
         dd_ref.extend(dist)
     # nice for understanding if something goes wrong
     idx_S = torch.from_numpy(idx_S).to(torch.float64)
+
+    print("idx_i", idx_i)
+    print("idx_j", idx_j)
     missing_entries = []
     for ineigh in range(idx_i.shape[0]):
         mask = torch.logical_and(
