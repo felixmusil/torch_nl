@@ -77,10 +77,9 @@ def get_linear_bin_idx(
     bin_index_l = ravel_3d(bin_index_s, nbins_s)
     return bin_index_l
 
-
 def scatter_bin_index(
-    nbins: torch.Tensor,
-    max_n_atom_per_bin: torch.Tensor,
+    nbins: int,
+    max_n_atom_per_bin: int,
     n_images: int,
     bin_index: torch.Tensor,
 ):
@@ -176,11 +175,11 @@ def linked_cell(
     # adapt the box lenghts so that it encompasses
     box_vec = torch.diag_embed(nbins_s * cutoff)
     nbins_s = nbins_s.to(torch.long)
-    nbins = torch.prod(nbins_s)
+    nbins = int(torch.prod(nbins_s))
     # determine which bins the original atoms and the images belong to following a linear indexing of the 3d bins
     bin_index_j = get_linear_bin_idx(box_vec, images, nbins_s)
     n_atom_j_per_bin = torch.bincount(bin_index_j, minlength=nbins)
-    max_n_atom_per_bin = n_atom_j_per_bin.max()
+    max_n_atom_per_bin = int(n_atom_j_per_bin.max())
     # convert the linear map bin_index_j into a 2d map. This allows for
     # fully vectorized neighbor assignment
     bin_id_j = scatter_bin_index(
