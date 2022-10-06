@@ -4,6 +4,14 @@ Provide a pytorch implementation of a naive (`compute_neighborlist_n2`) and a li
 
 Their correctness is tested against ASE's implementation.
 
+# How to instal
+
+## with pip
+
+```
+pip install torch-nl
+```
+
 ## Benchmarks
 
 ### Periodic structure
