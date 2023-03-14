@@ -1,4 +1,4 @@
-__version__ = "0.2b"
+__version__ = "0.3"
 
 from .neighbor_list import (
     compute_neighborlist,
