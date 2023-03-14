@@ -4,14 +4,15 @@ from typing import Tuple
 from .utils import get_number_of_cell_repeats, get_cell_shift_idx, strides_of
 
 
-# @torch.jit.script
 def get_fully_connected_mapping(
     i_ids: torch.Tensor, shifts_idx: torch.Tensor, self_interaction: bool
 ) -> Tuple[torch.Tensor, torch.Tensor]:
     n_atom = i_ids.shape[0]
     n_atom2 = n_atom * n_atom
     n_cell_image = shifts_idx.shape[0]
-    j_ids = torch.repeat_interleave(i_ids, n_cell_image)
+    j_ids = torch.repeat_interleave(
+        i_ids, n_cell_image, dim=0, output_size=n_cell_image * n_atom
+    )
     mapping = torch.cartesian_prod(i_ids, j_ids)
     shifts_idx = shifts_idx.repeat((n_atom2, 1))
     if not self_interaction:
@@ -29,7 +30,6 @@ def get_fully_connected_mapping(
     return mapping, shifts_idx
 
 
-# @torch.jit.script
 def build_naive_neighborhood(
     positions: torch.Tensor,
     cell: torch.Tensor,
@@ -58,8 +58,12 @@ def build_naive_neighborhood(
         )
         mapping.append(s_mapping)
         batch_mapping.append(
-            i_structure
-            * torch.ones(s_mapping.shape[0], dtype=torch.long, device=device)
+            torch.full(
+                (s_mapping.shape[0],),
+                i_structure,
+                dtype=torch.long,
+                device=device,
+            )
         )
         shifts_idx_.append(shifts_idx)
     return (
